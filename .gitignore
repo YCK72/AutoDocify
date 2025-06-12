@@ -1,0 +1,34 @@
+# Ignore virtual environments
+venv/
+docifyenv/
+.env/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# VS Code settings
+.vscode/
+
+# Output artifacts
+output/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Jupyter checkpoints (if using notebooks later)
+.ipynb_checkpoints/
+
+# Environment files
+.env
+*.env
+
+# Mac/Linux specific
+*.swp
+
+Lib/
+Scripts/
+pyvenv.cfg
