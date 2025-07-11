@@ -17,6 +17,7 @@ from utils import make_json_serializable
 from formatter import format_docstring
 from doc_generator import generate_function_doc, generate_class_doc, generate_readme
 from overview_generator import generate_code_overview
+from doc_exporter import export_to_markdown, export_to_word, load_metadata
 
 def select_python_file():
     """Open a file dialog for the user to choose a Python file."""
@@ -105,22 +106,42 @@ def run_module2_on_metadata(metadata, output_file):
         print(f"Failed to generate README.md: {e}")
 
 def main():
-    print("Please select a Python file to process...")
+    print("📂 Please select a Python file to process...")
     file_path = select_python_file()
 
-    if file_path:
-        print(f"\nSelected: {file_path}")
-        output_metadata_file = os.path.join("output", f"{Path(file_path).stem}_metadata.json")
+    if not file_path:
+        print("❌ No file selected.")
+        return
 
-        metadata = run_module1_on_file(file_path, output_metadata_file)
+    print(f"\n✅ Selected: {file_path}")
 
-        if metadata:
-            enriched_metadata_file = os.path.join("output", f"{Path(file_path).stem}_metadata_enriched.json")
-            run_module2_on_metadata(metadata, enriched_metadata_file)
-        else:
-            print("Module 1 failed. Skipping Module 2.")
-    else:
-        print("No file selected.")
+    base_name = Path(file_path).stem
+    output_dir = "output"
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Run Module 1 – Extract metadata
+    raw_metadata_path = os.path.join(output_dir, f"{base_name}_metadata.json")
+    metadata = run_module1_on_file(file_path, raw_metadata_path)
+
+    if not metadata:
+        print("❌ Module 1 failed. Skipping Module 2 and documentation export.")
+        return
+
+    # Run Module 2 – Enrich metadata with docstrings
+    enriched_metadata_path = os.path.join(output_dir, f"{base_name}_metadata_enriched.json")
+    run_module2_on_metadata(metadata, enriched_metadata_path)
+
+    # Load enriched metadata
+    enriched_metadata = load_metadata(enriched_metadata_path)
+
+    # Export to Markdown and Word formats
+    markdown_output_path = os.path.join(output_dir, f"{base_name}_docs.md")
+    word_output_path = os.path.join(output_dir, f"{base_name}_docs.docx")
+
+    export_to_markdown(enriched_metadata, markdown_output_path)
+    export_to_word(enriched_metadata, word_output_path)
+
+    print("\n🎉 All outputs generated successfully!")
 
 if __name__ == "__main__":
     main()
