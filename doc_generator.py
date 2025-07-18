@@ -28,13 +28,17 @@ Methods:\n{method_summaries}
     return call_grok_api(prompt)
 
 
+# doc_generator.py
+
 def generate_readme(metadata):
     from prompt_templates import README_PROMPT_TEMPLATE
+    from llm_wrapper import call_grok_api
+
     prompt = README_PROMPT_TEMPLATE.format(
-        classes=metadata["ast_data"]["classes"],
-        functions=metadata["ast_data"]["functions"],
-        imports=metadata["ast_data"]["imports"]
+        classes=metadata["ast_data"].get("classes", []),
+        functions=metadata["ast_data"].get("functions", []),
+        imports=metadata["ast_data"].get("imports", [])
     )
     response = call_grok_api(prompt)
-    log_prompt_and_response(prompt, response, tag="readme")
     return response
+

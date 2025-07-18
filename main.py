@@ -60,6 +60,7 @@ def run_module2_on_metadata(metadata, output_file):
     functions = updated_metadata.get("ast_data", {}).get("functions", [])
     classes = updated_metadata.get("ast_data", {}).get("classes", [])
 
+    # ✅ Step 1: Generate docstrings for functions
     for func_data in functions:
         func_name = func_data.get("name", "unknown_function")
         try:
@@ -68,6 +69,7 @@ def run_module2_on_metadata(metadata, output_file):
         except Exception as e:
             print(f"Failed to generate docstring for function {func_name}: {e}")
 
+    # ✅ Step 2: Generate docstrings for classes + methods
     for class_data in classes:
         class_name = class_data.get("name", "unknown_class")
         try:
@@ -87,23 +89,36 @@ def run_module2_on_metadata(metadata, output_file):
 
     output_path = Path(output_file)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-
     try:
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump(updated_metadata, f, indent=4)
         print(f"Enriched metadata saved to: {output_path}")
-        print(f"File exists: {output_path.exists()}, Size: {output_path.stat().st_size} bytes")
     except Exception as e:
         print(f"Error saving enriched metadata: {e}")
 
     try:
-        readme_text = generate_readme(updated_metadata)
+        # Ensure imports key always exists
+        if "imports" not in updated_metadata["ast_data"]:
+            updated_metadata["ast_data"]["imports"] = []
+
+        # Decide how to generate README
+        if not functions and not classes:
+            # Fallback: No functions/classes → generate a simple README
+            overview_text = updated_metadata.get("code_overview", "This module contains general-purpose Python code.")
+            readme_text = f"# {Path(updated_metadata['file_path']).name}\n\n{overview_text}\n"
+        else:
+            # Use LLM to generate a structured README
+            readme_text = generate_readme(updated_metadata)
+
+        # Save README.md
         readme_path = Path("output/README_generated.md")
         with open(readme_path, "w", encoding="utf-8") as f:
             f.write(readme_text)
         print(f"README.md generated at: {readme_path}")
+
     except Exception as e:
         print(f"Failed to generate README.md: {e}")
+
 
 def main():
     print("📂 Please select a Python file to process...")

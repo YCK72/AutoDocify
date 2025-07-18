@@ -28,7 +28,7 @@ def call_grok_api(prompt):
 
     response = requests.post(GROQ_API_URL, headers=headers, json=data)
     print(f"🔁 Status: {response.status_code}")
-    print(f"📨 Response text: {response.text[:300]}...")  # truncate long responses
+    print(f"📨 Response text: {response.text[:300]}...")
 
     response.raise_for_status()
 

@@ -25,6 +25,8 @@ Existing docstring (if any): {existing_doc}
 Respond with only the improved class docstring.
 """
 
+# prompt_templates.py
+
 README_PROMPT_TEMPLATE = """
 You're an expert technical writer. Based on the following metadata about a Python project, generate a professional README.md:
 
@@ -33,5 +35,13 @@ Project contains:
 - Functions: {functions}
 - Imports: {imports}
 
-Structure the README with a title, short description, features, usage, and installation steps.
+Structure the README with:
+1. Title
+2. Short description
+3. Features
+4. Usage
+5. Installation steps
+6. Example usage
+
+Respond with clean Markdown.
 """
