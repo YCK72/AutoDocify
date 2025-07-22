@@ -14,11 +14,16 @@ from langchain_community.chat_models import ChatOllama  # Uses local Ollama mode
 DEFAULT_VECTOR_DB_DIR = "output/vector_db"
 
 
-def index_code_file(file_path: str, persist_dir: str = DEFAULT_VECTOR_DB_DIR) -> None:
+def index_code_file(
+    file_path: str,
+    metadata_path: str = None,
+    persist_dir: str = DEFAULT_VECTOR_DB_DIR
+) -> None:
     """
-    Indexes a Python code file into a Chroma DB for semantic search.
-    Splits code into chunks, embeds, and persists them for later chatbot queries.
+    Indexes a Python code file + optional enriched metadata into a Chroma DB for semantic search.
+    Splits into chunks, embeds, and persists them for later chatbot queries.
     """
+
     # Ensure output directory exists
     Path(persist_dir).mkdir(parents=True, exist_ok=True)
 
@@ -28,7 +33,17 @@ def index_code_file(file_path: str, persist_dir: str = DEFAULT_VECTOR_DB_DIR) ->
     loader = TextLoader(file_path, encoding="utf-8")
     docs = loader.load()
 
-    # 2️⃣ Split code into chunks (helps with retrieval)
+    # ✅ If metadata is provided, load it too
+    if metadata_path and Path(metadata_path).exists():
+        print(f"📝 Adding enriched metadata: {metadata_path}")
+        with open(metadata_path, "r", encoding="utf-8") as meta_file:
+            metadata_text = meta_file.read()
+
+        # Append metadata as an extra "doc" chunk
+        from langchain.schema import Document
+        docs.append(Document(page_content=metadata_text, metadata={"source": metadata_path}))
+
+    # 2️⃣ Split into chunks for better retrieval
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=1000,
         chunk_overlap=200,
@@ -36,7 +51,7 @@ def index_code_file(file_path: str, persist_dir: str = DEFAULT_VECTOR_DB_DIR) ->
     )
     split_docs = splitter.split_documents(docs)
 
-    # 3️⃣ Create embeddings (HuggingFace lightweight model)
+    # 3️⃣ Create embeddings
     embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
     # 4️⃣ Create or update Chroma DB
@@ -54,7 +69,7 @@ def build_chatbot(
     model: str = "mistral"
 ):
     """
-    Builds a retrieval-based chatbot using the indexed code in Chroma DB.
+    Builds a retrieval-based chatbot using the indexed code + metadata in Chroma DB.
     Uses ChatOllama for answering questions.
     """
     # Check if vector DB exists
@@ -70,7 +85,7 @@ def build_chatbot(
     # Retriever (fetch top 3 most similar chunks)
     retriever = vectordb.as_retriever(search_type="similarity", search_kwargs={"k": 3})
 
-    # ChatOllama (local LLM) - you can switch model to "llama2", "mistral", etc.
+    # ChatOllama (local LLM) - can switch model to "llama2", "mistral", etc.
     llm = ChatOllama(model=model, streaming=True)
 
     # Retrieval-based QA Chain
@@ -83,7 +98,7 @@ def build_chatbot(
 
     def chatbot_fn(query: str) -> str:
         """
-        Ask a question about the indexed code and return a clean answer.
+        Ask a question about the indexed code and metadata, return a clean answer.
         """
         result = qa_chain.invoke(query)
         answer = result.get("result", "I could not find an answer.")

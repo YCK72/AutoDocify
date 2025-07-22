@@ -2,7 +2,10 @@ import streamlit as st
 import tempfile
 from pathlib import Path
 
+# Import the core processing functions
 from main import run_module1_on_file, run_module2_on_metadata
+
+# Import indexing + chatbot functions
 from index_and_chat import index_code_file, build_chatbot
 
 # Ensure output directory exists
@@ -123,22 +126,27 @@ if uploaded_file:
         # --------------------------------
         st.markdown("## 💬 Chat with the Uploaded Code")
 
-        with st.spinner("🔄 Indexing code for chatbot..."):
-            # Build Chroma DB from this file
-            index_code_file(temp_path)
+        # Index both code + enriched metadata into Chroma
+        with st.spinner("🔄 Indexing code + metadata for chatbot..."):
+            persist_dir = f"output/vector_db/{Path(uploaded_file.name).stem}"
+            index_code_file(
+                file_path=temp_path,
+                metadata_path=str(enriched_file_path),
+                persist_dir=persist_dir
+            )
 
         try:
-            # Load chatbot (ChatOllama by default, can change model name)
-            qa_bot = build_chatbot(model="mistral")
+            # Build chatbot using the indexed data
+            qa_bot = build_chatbot(model="mistral", persist_dir=persist_dir)
 
             st.markdown("### 💬 Ask questions about the uploaded code")
-            user_query = st.text_input("Your question:")
+            user_query = st.text_input("Type your question:")
 
             if user_query:
                 with st.spinner("🤖 Thinking..."):
-                    bot_response = qa_bot(user_query)  # Now returns clean text
+                    response = qa_bot(user_query)  # chatbot_fn returns answer + sources
                     st.markdown("**🤖 Bot Response:**")
-                    st.write(bot_response)
+                    st.write(response)
 
         except FileNotFoundError as e:
             st.error(str(e))
