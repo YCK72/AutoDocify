@@ -2,10 +2,13 @@ import streamlit as st
 import tempfile
 from pathlib import Path
 
-# Import the core processing functions
+# Core processing functions
 from main import run_module1_on_file, run_module2_on_metadata
 
-# Import indexing + chatbot functions
+# Documentation exporter functions
+from doc_exporter import export_to_markdown, export_to_word, load_metadata
+
+# Indexing + chatbot functions
 from index_and_chat import index_code_file, build_chatbot
 
 # Ensure output directory exists
@@ -61,6 +64,21 @@ if uploaded_file:
 
         st.success("✅ Enrichment complete!")
 
+        # ✅ NEW: After enrichment, export Markdown + Word documentation
+        with st.spinner("📄 Exporting documentation files..."):
+            enriched_metadata = load_metadata(str(enriched_file))
+
+            # Paths for docs
+            base_name = Path(uploaded_file.name).stem
+            markdown_file_path = Path("output") / f"{base_name}_docs.md"
+            word_file_path = Path("output") / f"{base_name}_docs.docx"
+
+            # Export documentation
+            export_to_markdown(enriched_metadata, markdown_file_path)
+            export_to_word(enriched_metadata, word_file_path)
+
+        st.success("✅ Documentation exported (Markdown + Word)")
+
         # ✅ Download Enriched Metadata
         enriched_file_path = Path("output") / f"{Path(uploaded_file.name).stem}_metadata_enriched.json"
         if enriched_file_path.exists():
@@ -93,10 +111,6 @@ if uploaded_file:
 
         # ✅ Download Final Documentation (Markdown + Word)
         st.markdown("## 📦 Download Final Documentation Files")
-        base_name = Path(uploaded_file.name).stem
-        markdown_file_path = Path("output") / f"{base_name}_docs.md"
-        word_file_path = Path("output") / f"{base_name}_docs.docx"
-
         if markdown_file_path.exists():
             with open(markdown_file_path, "r", encoding="utf-8") as f:
                 markdown_data = f.read()
@@ -144,9 +158,9 @@ if uploaded_file:
 
             if user_query:
                 with st.spinner("🤖 Thinking..."):
-                    response = qa_bot(user_query)  # chatbot_fn returns answer + sources
+                    bot_response = qa_bot(user_query)
                     st.markdown("**🤖 Bot Response:**")
-                    st.write(response)
+                    st.write(bot_response)
 
         except FileNotFoundError as e:
             st.error(str(e))

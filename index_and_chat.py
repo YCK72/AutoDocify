@@ -8,7 +8,7 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import TextLoader
 from langchain.chains import RetrievalQA
-from langchain_community.chat_models import ChatOllama  # Uses local Ollama models
+from langchain_openai import ChatOpenAI # Uses local Ollama models
 
 # Persistent vector DB directory
 DEFAULT_VECTOR_DB_DIR = "output/vector_db"
@@ -86,7 +86,13 @@ def build_chatbot(
     retriever = vectordb.as_retriever(search_type="similarity", search_kwargs={"k": 3})
 
     # ChatOllama (local LLM) - can switch model to "llama2", "mistral", etc.
-    llm = ChatOllama(model=model, streaming=True)
+    llm = ChatOpenAI(
+        model="mistral-saba-24b",
+        base_url="https://api.groq.com/openai/v1",
+        api_key=os.getenv("GROQ_API_KEY"),
+        streaming=True
+    )
+
 
     # Retrieval-based QA Chain
     qa_chain = RetrievalQA.from_chain_type(

@@ -1,0 +1,1 @@
+#pip install : docx, streamlit , dotenv , python-docx, langchain_community, pip install sentence-transformers, chroma-db
