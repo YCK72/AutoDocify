@@ -1,5 +1,4 @@
 # index_and_chat.py
-
 import os
 from pathlib import Path
 
@@ -7,8 +6,8 @@ from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import TextLoader
-from langchain.chains import RetrievalQA
-from langchain_openai import ChatOpenAI # Uses local Ollama models
+from langchain.chains import ConversationalRetrievalChain
+from langchain_openai import ChatOpenAI  # Groq-compatible OpenAI client
 
 # Persistent vector DB directory
 DEFAULT_VECTOR_DB_DIR = "output/vector_db"
@@ -23,7 +22,6 @@ def index_code_file(
     Indexes a Python code file + optional enriched metadata into a Chroma DB for semantic search.
     Splits into chunks, embeds, and persists them for later chatbot queries.
     """
-
     # Ensure output directory exists
     Path(persist_dir).mkdir(parents=True, exist_ok=True)
 
@@ -64,13 +62,28 @@ def index_code_file(
     print(f"✅ Indexed {len(split_docs)} chunks into Chroma DB at: {persist_dir}")
 
 
+def _select_model(explicit: str | None) -> str:
+    """
+    Return the model to use:
+      1) the explicit arg if provided,
+      2) else env var GROQ_MODEL,
+      3) else a safe default.
+    """
+    return explicit or os.getenv("GROQ_MODEL", "qwen/qwen3-32b")
+
+
 def build_chatbot(
     persist_dir: str = DEFAULT_VECTOR_DB_DIR,
-    model: str = "mistral"
+    model: str | None = None
 ):
     """
-    Builds a retrieval-based chatbot using the indexed code + metadata in Chroma DB.
-    Uses ChatOllama for answering questions.
+    Builds a conversational retrieval chatbot using the indexed code + metadata in Chroma DB.
+    This version supports *continuous* conversation across turns and uses a non-deprecated model.
+
+    Set a model via:
+      - passing `model=` (e.g., "llama-3.3-70b-versatile")
+      - or environment variable GROQ_MODEL
+      - falls back to "qwen/qwen3-32b"
     """
     # Check if vector DB exists
     if not Path(persist_dir).exists():
@@ -85,38 +98,24 @@ def build_chatbot(
     # Retriever (fetch top 3 most similar chunks)
     retriever = vectordb.as_retriever(search_type="similarity", search_kwargs={"k": 3})
 
-    # ChatOllama (local LLM) - can switch model to "llama2", "mistral", etc.
+    # ✅ Groq via OpenAI-compatible client — NO deprecated model names
+    selected_model = _select_model(model)
+    print(f"🔧 Using Groq model: {selected_model}")
+
     llm = ChatOpenAI(
-        model="mistral-saba-24b",
-        base_url="https://api.groq.com/openai/v1",
+        model=selected_model,
+        base_url=os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1"),
         api_key=os.getenv("GROQ_API_KEY"),
-        streaming=True
+        streaming=True,
+        temperature=0.2,
     )
 
-
-    # Retrieval-based QA Chain
-    qa_chain = RetrievalQA.from_chain_type(
+    # ✅ Conversational + Retrieval-aware chain (continuous memory via chat_history)
+    crc = ConversationalRetrievalChain.from_llm(
         llm=llm,
         retriever=retriever,
         chain_type="stuff",
         return_source_documents=True
     )
 
-    def chatbot_fn(query: str) -> str:
-        """
-        Ask a question about the indexed code and metadata, return a clean answer.
-        """
-        result = qa_chain.invoke(query)
-        answer = result.get("result", "I could not find an answer.")
-        sources = result.get("source_documents", [])
-
-        # Optional: append sources for transparency
-        if sources:
-            source_list = "\n".join(
-                f"- {Path(src.metadata.get('source', 'unknown')).name}" for src in sources
-            )
-            answer += f"\n\n**Sources:**\n{source_list}"
-
-        return answer
-
-    return chatbot_fn
+    return crc
